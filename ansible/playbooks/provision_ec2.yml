@@ -1,0 +1,38 @@
+---
+# PocketOps - EC2プロビジョニング Playbook
+# 対象: Amazon Linux 2023
+# 用途: Docker・必須パッケージのインストール、セキュリティ基本設定
+
+- name: EC2基本プロビジョニング
+  hosts: pocketops_dev
+  become: true
+  gather_facts: true
+
+  vars:
+    app_user: pocketops
+    docker_compose_version: "2.24.0"
+    node_version: "20"
+
+  pre_tasks:
+    - name: システム情報の確認
+      debug:
+        msg: "Host: {{ inventory_hostname }} | OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+    - name: パッケージキャッシュの更新
+      dnf:
+        update_cache: true
+      changed_when: false
+
+  roles:
+    - common
+    - docker
+
+  post_tasks:
+    - name: プロビジョニング完了確認
+      command: docker --version
+      register: docker_ver
+      changed_when: false
+
+    - name: Docker バージョン表示
+      debug:
+        msg: "{{ docker_ver.stdout }}"

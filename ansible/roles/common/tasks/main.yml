@@ -1,0 +1,52 @@
+---
+# common role - 共通パッケージ・セキュリティ設定
+
+- name: 必須パッケージのインストール
+  dnf:
+    name:
+      - git
+      - curl
+      - wget
+      - unzip
+      - python3
+      - python3-pip
+      - htop
+      - jq
+    state: present
+
+- name: タイムゾーンの設定（Asia/Tokyo）
+  community.general.timezone:
+    name: Asia/Tokyo
+
+- name: アプリ用ユーザーの作成
+  user:
+    name: "{{ app_user }}"
+    groups: wheel
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: SSHパスワード認証の無効化（鍵認証のみ）
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+    backup: true
+  notify: restart_sshd
+
+- name: firewalldの起動・自動起動設定
+  systemd:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: アプリポートの許可
+  firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - "8080"
+    - "9100"
+    - "22"

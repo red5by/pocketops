@@ -1,0 +1,27 @@
+---
+# app role - PocketOps アプリ環境設定
+
+- name: アプリ用ディレクトリ構造の作成
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    mode: "0755"
+  loop:
+    - /opt/pocketops
+    - /opt/pocketops/logs
+    - /opt/pocketops/config
+
+- name: ログローテーション設定
+  copy:
+    dest: /etc/logrotate.d/pocketops
+    content: |
+      /opt/pocketops/logs/*.log {
+          daily
+          rotate 7
+          compress
+          missingok
+          notifempty
+          create 0644 {{ app_user }} {{ app_user }}
+      }
+    mode: "0644"

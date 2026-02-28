@@ -1,0 +1,51 @@
+---
+# PocketOps - Docker コンテナデプロイ Playbook
+# 用途: モニタリングスタック（cAdvisor + Node Exporter）のデプロイ
+#       PocketOpsアプリからAPI経由でトリガー可能
+
+- name: モニタリングスタックのデプロイ
+  hosts: pocketops_dev
+  become: true
+  gather_facts: false
+
+  vars:
+    compose_dir: /opt/pocketops
+    cadvisor_port: 8080
+    node_exporter_port: 9100
+
+  tasks:
+    - name: アプリディレクトリの作成
+      file:
+        path: "{{ compose_dir }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+
+    - name: docker-compose.yml の配置
+      template:
+        src: ../roles/app/templates/docker-compose.yml.j2
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        mode: "0644"
+      notify: restart_containers
+
+    - name: コンテナの起動
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_dir }}"
+        state: present
+        pull: always
+      register: compose_result
+
+    - name: 起動コンテナ一覧の確認
+      command: docker ps --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Ports{{ '}}' }}"
+      register: docker_ps
+      changed_when: false
+
+    - name: コンテナ状態の表示
+      debug:
+        msg: "{{ docker_ps.stdout_lines }}"
+
+  handlers:
+    - name: restart_containers
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_dir }}"
+        state: restarted

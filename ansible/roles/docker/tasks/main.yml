@@ -1,0 +1,66 @@
+---
+# docker role - Docker Engine インストール・設定
+
+- name: Docker リポジトリの追加
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: "0644"
+
+- name: Docker Engine のインストール
+  dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: Docker サービスの起動・自動起動設定
+  systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: ec2-user を docker グループに追加（再ログイン不要にするためnewgrp不使用）
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: アプリユーザーを docker グループに追加
+  user:
+    name: "{{ app_user }}"
+    groups: docker
+    append: true
+
+- name: Docker デーモン設定（ログローテーション・ストレージドライバ）
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "storage-driver": "overlay2"
+      }
+    mode: "0644"
+  notify: restart_docker
+
+- name: Docker の動作確認（hello-world）
+  community.docker.docker_container:
+    name: hello-world-test
+    image: hello-world
+    state: started
+    auto_remove: true
+  register: hello_result
+  changed_when: false
+
+handlers:
+  - name: restart_docker
+    systemd:
+      name: docker
+      state: restarted
