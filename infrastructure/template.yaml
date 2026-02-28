@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: PocketOps - SAM Template (API Gateway + Lambda)
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 128
+    Environment:
+      Variables:
+        AWS_REGION: !Ref AWS::Region
+        TARGET_TAG_VALUE: PocketOps
+
+Parameters:
+  AnsibleControllerInstanceId:
+    Type: String
+    Description: Ansible Controllerとして動かすEC2のインスタンスID
+    Default: ""
+
+Resources:
+
+  # ── API Gateway ──────────────────────────────────────────
+  PocketOpsApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: pocketops-api
+      StageName: v1
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+
+  # ── Lambda: EC2 Manager ───────────────────────────────────
+  Ec2ManagerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pocketops-ec2-manager
+      CodeUri: ../lambda/ec2_manager/
+      Handler: handler.handler
+      Description: EC2インスタンスの状態取得・起動・停止
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ec2:DescribeInstances
+                - ec2:StartInstances
+                - ec2:StopInstances
+              Resource: "*"
+      Events:
+        ListInstances:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /ec2
+            Method: GET
+        ToggleInstance:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /ec2/{instanceId}/{action}
+            Method: POST
+
+  # ── Lambda: Docker Status ─────────────────────────────────
+  DockerStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pocketops-docker-status
+      CodeUri: ../lambda/docker_status/
+      Handler: handler.handler
+      Description: SSM経由でEC2上のDockerコンテナ状態を取得
+      Timeout: 60
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:SendCommand
+                - ssm:GetCommandInvocation
+              Resource: "*"
+      Events:
+        GetContainers:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /ec2/{instanceId}/containers
+            Method: GET
+
+  # ── Lambda: Playbook Runner ───────────────────────────────
+  PlaybookRunnerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pocketops-playbook-runner
+      CodeUri: ../lambda/playbook_runner/
+      Handler: handler.handler
+      Description: Ansible Playbookをトリガーする
+      Timeout: 30
+      Environment:
+        Variables:
+          ANSIBLE_CONTROLLER_INSTANCE_ID: !Ref AnsibleControllerInstanceId
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:SendCommand
+                - ssm:GetCommandInvocation
+              Resource: "*"
+      Events:
+        ListPlaybooks:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /playbooks
+            Method: GET
+        RunPlaybook:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /playbooks/run
+            Method: POST
+
+Outputs:
+  ApiBaseUrl:
+    Description: API GatewayのベースURL
+    Value: !Sub "https://${PocketOpsApi}.execute-api.${AWS::Region}.amazonaws.com/v1"
+  Ec2ManagerArn:
+    Value: !GetAtt Ec2ManagerFunction.Arn
+  DockerStatusArn:
+    Value: !GetAtt DockerStatusFunction.Arn
+  PlaybookRunnerArn:
+    Value: !GetAtt PlaybookRunnerFunction.Arn
