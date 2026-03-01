@@ -1,7 +1,6 @@
 # PocketOps
 
 スマートフォンから EC2・Docker・Ansible を操作できるインフラ管理モバイルアプリ。
-職務経歴書記載のスキル（React Native / AWS / Docker / Ansible / Kotlin）を実践的に組み合わせた個人開発プロジェクト。
 
 ---
 
