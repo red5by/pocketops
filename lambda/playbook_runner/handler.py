@@ -35,6 +35,10 @@ def handler(event, context):
             body = json.loads(event.get("body") or "{}")
             return run_playbook(body)
 
+        path_parts = path.split("/")
+        if method == "GET" and len(path_parts) == 4 and path_parts[1] == "playbooks" and path_parts[2] == "status":
+            return get_playbook_status(path_parts[3])
+
         return _response(404, {"error": "Not Found"})
 
     except (ClientError, json.JSONDecodeError, RuntimeError) as e:
@@ -101,6 +105,40 @@ def run_playbook(body: dict):
             "startedAt": datetime.now(timezone.utc).isoformat(),
         },
     )
+
+
+def get_playbook_status(command_id: str):
+    """SSMコマンドの実行ステータスを取得する"""
+    if not ANSIBLE_CONTROLLER_ID:
+        return _response(500, {"error": "ANSIBLE_CONTROLLER_INSTANCE_ID is not configured"})
+
+    try:
+        resp = ssm.get_command_invocation(
+            CommandId=command_id,
+            InstanceId=ANSIBLE_CONTROLLER_ID,
+        )
+    except ClientError as e:
+        code = e.response["Error"]["Code"]
+        if code == "InvocationDoesNotExist":
+            return _response(404, {"error": "Command not found"})
+        raise
+
+    raw_status = resp.get("Status", "Unknown")
+    # SSM statuses: Pending / InProgress / Success / Failed / TimedOut / Cancelled
+    if raw_status in ("Pending", "InProgress", "Delayed"):
+        status = "InProgress"
+    elif raw_status == "Success":
+        status = "Success"
+    elif raw_status == "TimedOut":
+        status = "TimedOut"
+    else:
+        status = "Failed"
+
+    return _response(200, {
+        "commandId": command_id,
+        "status": status,
+        "output": resp.get("StandardOutputContent", ""),
+    })
 
 
 def _describe(name: str) -> str:

@@ -118,6 +118,12 @@ Resources:
             RestApiId: !Ref PocketOpsApi
             Path: /playbooks/run
             Method: POST
+        GetPlaybookStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /playbooks/status/{commandId}
+            Method: GET
 
 Outputs:
   ApiBaseUrl:

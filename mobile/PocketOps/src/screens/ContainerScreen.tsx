@@ -8,9 +8,10 @@ import {
   RefreshControl,
 } from 'react-native';
 import {fetchContainers, Container} from '../api/client';
+import {usePolling} from '../hooks/usePolling';
 
 type Props = {
-  instanceId: string;
+  instanceId: string | null;
 };
 
 export default function ContainerScreen({instanceId}: Props) {
@@ -20,6 +21,7 @@ export default function ContainerScreen({instanceId}: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const load = async (isRefresh = false) => {
+    if (!instanceId) return;
     isRefresh ? setRefreshing(true) : setLoading(true);
     setError(null);
     try {
@@ -34,10 +36,24 @@ export default function ContainerScreen({instanceId}: Props) {
   };
 
   useEffect(() => {
-    load();
+    if (instanceId) {
+      setLoading(true);
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
 
+  usePolling(() => load(), 30_000, !!instanceId);
+
   const isUp = (status: string) => status.toLowerCase().startsWith('up');
+
+  if (!instanceId) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.hint}>EC2タブでインスタンスを選択してください</Text>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -82,6 +98,7 @@ export default function ContainerScreen({instanceId}: Props) {
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#f0f2f5', padding: 16},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  hint: {color: '#888', fontSize: 16, textAlign: 'center'},
   title: {fontSize: 20, fontWeight: 'bold'},
   sub: {color: '#888', fontSize: 12, marginBottom: 12},
   error: {color: 'red', marginBottom: 8},

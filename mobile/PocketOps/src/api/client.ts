@@ -83,3 +83,12 @@ export const runPlaybook = (
     method: 'POST',
     body: JSON.stringify({playbook, targetHost: targetHost ?? 'all', extraVars}),
   });
+
+export type PlaybookStatus = {
+  commandId: string;
+  status: 'InProgress' | 'Success' | 'Failed' | 'TimedOut';
+  output?: string;
+};
+
+export const getPlaybookStatus = (commandId: string): Promise<PlaybookStatus> =>
+  request(`/playbooks/status/${commandId}`);

@@ -10,7 +10,11 @@ import {
 } from 'react-native';
 import {fetchInstances, toggleInstance, EC2Instance} from '../api/client';
 
-export default function DashboardScreen() {
+type Props = {
+  onSelectInstance?: (instanceId: string) => void;
+};
+
+export default function DashboardScreen({onSelectInstance}: Props) {
   const [instances, setInstances] = useState<EC2Instance[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -77,17 +81,24 @@ export default function DashboardScreen() {
             <Text style={styles.meta}>
               {item.type} {item.publicIp ? `• ${item.publicIp}` : ''}
             </Text>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                item.state === 'running' ? styles.btnStop : styles.btnStart,
-              ]}
-              onPress={() => handleToggle(item)}
-              disabled={['pending', 'stopping'].includes(item.state)}>
-              <Text style={styles.btnText}>
-                {item.state === 'running' ? '停止' : '起動'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  item.state === 'running' ? styles.btnStop : styles.btnStart,
+                ]}
+                onPress={() => handleToggle(item)}
+                disabled={['pending', 'stopping'].includes(item.state)}>
+                <Text style={styles.btnText}>
+                  {item.state === 'running' ? '停止' : '起動'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnDocker}
+                onPress={() => onSelectInstance?.(item.instanceId)}>
+                <Text style={styles.btnText}>Docker確認</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
         ListEmptyComponent={
@@ -111,9 +122,11 @@ const styles = StyleSheet.create({
   running: {backgroundColor: '#d4f5d4'},
   stopped: {backgroundColor: '#f5d4d4'},
   badgeText: {fontSize: 12, fontWeight: '600'},
-  button: {borderRadius: 6, padding: 8, alignItems: 'center'},
+  actions: {flexDirection: 'row', gap: 8},
+  button: {flex: 1, borderRadius: 6, padding: 8, alignItems: 'center'},
   btnStart: {backgroundColor: '#2196F3'},
   btnStop: {backgroundColor: '#f44336'},
+  btnDocker: {flex: 1, borderRadius: 6, padding: 8, alignItems: 'center', backgroundColor: '#607D8B'},
   btnText: {color: '#fff', fontWeight: '600'},
   empty: {textAlign: 'center', color: '#888', marginTop: 40},
 });

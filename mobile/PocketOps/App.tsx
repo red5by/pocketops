@@ -1,22 +1,60 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, SafeAreaView} from 'react-native';
 import DashboardScreen from './src/screens/DashboardScreen';
 import ContainerScreen from './src/screens/ContainerScreen';
 import PlaybookScreen from './src/screens/PlaybookScreen';
+import BiometricAuth from './src/native/BiometricAuth';
 
 type Tab = 'dashboard' | 'containers' | 'playbooks';
 
-// TODO: DashboardScreen でインスタンスを選択したら渡す
-const DEMO_INSTANCE_ID = 'i-xxxxxxxxxxxxxxxxx';
-
 function App() {
+  const [locked, setLocked] = useState(true);
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+
+  const authenticate = async () => {
+    try {
+      const result = await BiometricAuth.authenticate();
+      if (result) {
+        setLocked(false);
+      }
+    } catch {
+      // 認証失敗・エラー時はロック画面のまま
+    }
+  };
+
+  useEffect(() => {
+    authenticate();
+  }, []);
+
+  if (locked) {
+    return (
+      <SafeAreaView style={styles.lockSafe}>
+        <View style={styles.lockContainer}>
+          <Text style={styles.lockTitle}>PocketOps</Text>
+          <Text style={styles.lockSubtitle}>インフラ管理アプリ</Text>
+          <TouchableOpacity style={styles.lockButton} onPress={authenticate}>
+            <Text style={styles.lockButtonText}>認証する 🔒</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const handleSelectInstance = (id: string) => {
+    setSelectedInstanceId(id);
+    setTab('containers');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.body}>
-        {tab === 'dashboard' && <DashboardScreen />}
-        {tab === 'containers' && <ContainerScreen instanceId={DEMO_INSTANCE_ID} />}
+        {tab === 'dashboard' && (
+          <DashboardScreen onSelectInstance={handleSelectInstance} />
+        )}
+        {tab === 'containers' && (
+          <ContainerScreen instanceId={selectedInstanceId} />
+        )}
         {tab === 'playbooks' && <PlaybookScreen />}
       </View>
 
@@ -50,6 +88,18 @@ const styles = StyleSheet.create({
   tabActive: {borderTopWidth: 2, borderTopColor: '#2196F3'},
   tabText: {color: '#888', fontSize: 13},
   tabTextActive: {color: '#2196F3', fontWeight: '600'},
+  lockSafe: {flex: 1, backgroundColor: '#fff'},
+  lockContainer: {flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16},
+  lockTitle: {fontSize: 28, fontWeight: '700', color: '#1a1a1a'},
+  lockSubtitle: {fontSize: 15, color: '#666'},
+  lockButton: {
+    marginTop: 24,
+    backgroundColor: '#2196F3',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 8,
+  },
+  lockButtonText: {color: '#fff', fontSize: 16, fontWeight: '600'},
 });
 
 export default App;

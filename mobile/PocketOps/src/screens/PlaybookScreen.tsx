@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -8,21 +8,62 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import {fetchPlaybooks, runPlaybook, Playbook, PlaybookRun} from '../api/client';
+import {
+  fetchPlaybooks,
+  runPlaybook,
+  getPlaybookStatus,
+  Playbook,
+  PlaybookRun,
+  PlaybookStatus,
+} from '../api/client';
+
+const STATUS_COLORS: Record<string, string> = {
+  InProgress: '#FF6F00',
+  Success: '#4CAF50',
+  Failed: '#f44336',
+  TimedOut: '#9E9E9E',
+};
 
 export default function PlaybookScreen() {
   const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<PlaybookRun | null>(null);
+  const [runStatus, setRunStatus] = useState<PlaybookStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCountRef = useRef(0);
 
   useEffect(() => {
     fetchPlaybooks()
       .then(d => setPlaybooks(d.playbooks))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, []);
+
+  const startPolling = (commandId: string) => {
+    pollCountRef.current = 0;
+    if (pollRef.current) clearInterval(pollRef.current);
+
+    pollRef.current = setInterval(async () => {
+      pollCountRef.current += 1;
+      try {
+        const status = await getPlaybookStatus(commandId);
+        setRunStatus(status);
+        if (status.status !== 'InProgress' || pollCountRef.current >= 12) {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+        }
+      } catch {
+        // ignore polling errors silently
+      }
+    }, 10_000);
+  };
 
   const handleRun = (pb: Playbook) => {
     Alert.alert(
@@ -36,9 +77,12 @@ export default function PlaybookScreen() {
           onPress: async () => {
             setRunning(pb.name);
             setError(null);
+            setRunStatus(null);
             try {
               const result = await runPlaybook(pb.name);
               setLastRun(result);
+              setRunStatus({commandId: result.commandId, status: 'InProgress'});
+              startPolling(result.commandId);
             } catch (e: any) {
               setError(e.message);
             } finally {
@@ -66,10 +110,22 @@ export default function PlaybookScreen() {
       {lastRun && (
         <View style={styles.result}>
           <Text style={styles.resultTitle}>最終実行</Text>
-          <Text>{lastRun.playbook} — {lastRun.status}</Text>
+          <View style={styles.resultRow}>
+            <Text>{lastRun.playbook}</Text>
+            {runStatus && (
+              <Text style={[styles.statusBadge, {color: STATUS_COLORS[runStatus.status] ?? '#333'}]}>
+                {runStatus.status}
+              </Text>
+            )}
+          </View>
           <Text style={styles.resultMeta}>
             ID: {lastRun.runId} / {new Date(lastRun.startedAt).toLocaleString('ja-JP')}
           </Text>
+          {runStatus?.output ? (
+            <Text style={styles.output} numberOfLines={4}>
+              {runStatus.output}
+            </Text>
+          ) : null}
         </View>
       )}
 
@@ -107,7 +163,10 @@ const styles = StyleSheet.create({
   error: {color: 'red', marginBottom: 8},
   result: {backgroundColor: '#e8f5e9', borderRadius: 8, padding: 12, marginBottom: 12},
   resultTitle: {fontWeight: 'bold', marginBottom: 4},
+  resultRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  statusBadge: {fontWeight: '700', fontSize: 13},
   resultMeta: {color: '#666', fontSize: 11, marginTop: 2},
+  output: {color: '#333', fontSize: 11, marginTop: 6, fontFamily: 'monospace'},
   card: {backgroundColor: '#fff', borderRadius: 8, padding: 14, marginBottom: 10},
   name: {fontSize: 15, fontWeight: '600'},
   desc: {color: '#555', marginTop: 4, marginBottom: 10},
