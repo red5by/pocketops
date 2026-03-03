@@ -11,15 +11,17 @@ function App() {
   const [locked, setLocked] = useState(true);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const authenticate = async () => {
+    setAuthError(null);
     try {
       const result = await BiometricAuth.authenticate();
       if (result) {
         setLocked(false);
       }
-    } catch {
-      // 認証失敗・エラー時はロック画面のまま
+    } catch (e: any) {
+      setAuthError(e?.message ?? '認証に失敗しました');
     }
   };
 
@@ -33,6 +35,9 @@ function App() {
         <View style={styles.lockContainer}>
           <Text style={styles.lockTitle}>PocketOps</Text>
           <Text style={styles.lockSubtitle}>インフラ管理アプリ</Text>
+          {authError ? (
+            <Text style={styles.lockError}>{authError}</Text>
+          ) : null}
           <TouchableOpacity style={styles.lockButton} onPress={authenticate}>
             <Text style={styles.lockButtonText}>認証する 🔒</Text>
           </TouchableOpacity>
@@ -100,6 +105,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   lockButtonText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  lockError: {color: '#f44336', fontSize: 13, textAlign: 'center', paddingHorizontal: 24},
 });
 
 export default App;

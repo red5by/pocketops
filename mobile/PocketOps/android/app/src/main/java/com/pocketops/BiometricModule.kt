@@ -16,7 +16,7 @@ class BiometricModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun authenticate(promise: Promise) {
-        val activity = currentActivity as? FragmentActivity
+        val activity = reactApplicationContext.currentActivity as? FragmentActivity
             ?: return promise.reject("NO_ACTIVITY", "Activity not available")
 
         val manager = BiometricManager.from(reactApplicationContext)
