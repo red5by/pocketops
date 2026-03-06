@@ -10,7 +10,6 @@ Globals:
     MemorySize: 128
     Environment:
       Variables:
-        AWS_REGION: !Ref AWS::Region
         TARGET_TAG_VALUE: PocketOps
 
 Parameters:
@@ -125,6 +124,53 @@ Resources:
             Path: /playbooks/status/{commandId}
             Method: GET
 
+  # ── Lambda: Cost Monitor ──────────────────────────────────
+  CostMonitorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: pocketops-cost-monitor
+      CodeUri: ../lambda/cost_monitor/
+      Handler: handler.handler
+      Description: AWS Cost Explorer取得・閾値管理
+      Timeout: 60
+      MemorySize: 256
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [ce:GetCostAndUsage]
+              Resource: "*"
+            - Effect: Allow
+              Action: [ssm:GetParameter, ssm:PutParameter]
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pocketops/*"
+            - Effect: Allow
+              Action: [ec2:DescribeInstances]
+              Resource: "*"
+      Events:
+        GetCosts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /costs
+            Method: GET
+        GetThreshold:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /costs/threshold
+            Method: GET
+        SetThreshold:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /costs/threshold
+            Method: POST
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 1 * * ? *)
+            Description: 日次コストチェック
+            Enabled: true
+
 Outputs:
   ApiBaseUrl:
     Description: API GatewayのベースURL
@@ -135,3 +181,5 @@ Outputs:
     Value: !GetAtt DockerStatusFunction.Arn
   PlaybookRunnerArn:
     Value: !GetAtt PlaybookRunnerFunction.Arn
+  CostMonitorArn:
+    Value: !GetAtt CostMonitorFunction.Arn

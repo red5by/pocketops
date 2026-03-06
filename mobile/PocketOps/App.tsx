@@ -1,11 +1,18 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, SafeAreaView} from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+} from 'react-native';
 import DashboardScreen from './src/screens/DashboardScreen';
 import ContainerScreen from './src/screens/ContainerScreen';
 import PlaybookScreen from './src/screens/PlaybookScreen';
+import CostScreen from './src/screens/CostScreen';
 import BiometricAuth from './src/native/BiometricAuth';
 
-type Tab = 'dashboard' | 'containers' | 'playbooks';
+type Tab = 'dashboard' | 'containers' | 'playbooks' | 'costs';
 
 function App() {
   const [locked, setLocked] = useState(true);
@@ -61,6 +68,7 @@ function App() {
           <ContainerScreen instanceId={selectedInstanceId} />
         )}
         {tab === 'playbooks' && <PlaybookScreen />}
+        {tab === 'costs' && <CostScreen />}
       </View>
 
       <View style={styles.tabBar}>
@@ -69,6 +77,7 @@ function App() {
             {key: 'dashboard', label: 'EC2'},
             {key: 'containers', label: 'Docker'},
             {key: 'playbooks', label: 'Playbook'},
+            {key: 'costs', label: 'Costs'},
           ] as {key: Tab; label: string}[]
         ).map(t => (
           <TouchableOpacity
@@ -91,7 +100,7 @@ const styles = StyleSheet.create({
   tabBar: {flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#ddd'},
   tab: {flex: 1, alignItems: 'center', paddingVertical: 12},
   tabActive: {borderTopWidth: 2, borderTopColor: '#2196F3'},
-  tabText: {color: '#888', fontSize: 13},
+  tabText: {color: '#888', fontSize: 12},
   tabTextActive: {color: '#2196F3', fontWeight: '600'},
   lockSafe: {flex: 1, backgroundColor: '#fff'},
   lockContainer: {flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16},

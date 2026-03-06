@@ -22,6 +22,11 @@ ansible-playbook ansible/playbooks/provision_ec2.yml
 cd mobile/PocketOps && npx react-native run-android
 ```
 
+## コミュニケーションスタイル
+
+実装作業中は、各ステップごとに **【解説】** として中学生向けの説明を100〜200文字程度（日本語）で添えること。
+例：「**【解説】** Lambdaというのは、AWSというクラウドサービス上で動く小さなプログラムです。今回はそこにコストを計算するコードを送り込んでいます。」
+
 ## 開発方針
 
 - Lambda関数は `_response(status, body)` ヘルパーで統一

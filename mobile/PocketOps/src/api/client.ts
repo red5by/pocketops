@@ -6,7 +6,7 @@
 
 const BASE_URL =
   process.env.API_BASE_URL ??
-  'https://YOUR_API_ID.execute-api.ap-northeast-1.amazonaws.com/v1';
+  'https://yp2qvijfk1.execute-api.ap-northeast-1.amazonaws.com/v1';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -92,3 +92,26 @@ export type PlaybookStatus = {
 
 export const getPlaybookStatus = (commandId: string): Promise<PlaybookStatus> =>
   request(`/playbooks/status/${commandId}`);
+
+// ── Costs ──────────────────────────────────────────────
+
+export type ServiceCost = {service: string; cost: number};
+export type CostEC2Instance = {instanceId: string; name: string; state: string; type: string};
+export type CostSummary = {
+  daily: {yesterday: number; dayBefore: number; percentChange: number | null; currency: string};
+  monthly: {thisMonth: number; lastMonth: number; percentChange: number | null; currency: string};
+  serviceBreakdown: ServiceCost[];
+  ec2Instances: CostEC2Instance[];
+  threshold: number | null;
+  thresholdExceeded: boolean;
+};
+
+export const fetchCosts = (): Promise<CostSummary> => request('/costs');
+export const registerDeviceToken = (
+  token: string,
+): Promise<{registered: boolean; tokenCount: number}> =>
+  request('/costs/device-token', {method: 'POST', body: JSON.stringify({token})});
+export const updateThreshold = (
+  threshold: number,
+): Promise<{threshold: number; currency: string}> =>
+  request('/costs/threshold', {method: 'POST', body: JSON.stringify({threshold})});
