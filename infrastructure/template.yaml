@@ -26,10 +26,38 @@ Resources:
     Properties:
       Name: pocketops-api
       StageName: v1
+      Auth:
+        ApiKeyRequired: true
       Cors:
         AllowMethods: "'GET,POST,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization'"
+        AllowHeaders: "'Content-Type,Authorization,x-api-key'"
         AllowOrigin: "'*'"
+
+  PocketOpsApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: PocketOpsApiV1Stage
+    Properties:
+      Name: pocketops-api-key
+      Enabled: true
+      StageKeys:
+        - RestApiId: !Ref PocketOpsApi
+          StageName: v1
+
+  PocketOpsUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: PocketOpsApiV1Stage
+    Properties:
+      UsagePlanName: pocketops-usage-plan
+      ApiStages:
+        - ApiId: !Ref PocketOpsApi
+          Stage: v1
+
+  PocketOpsUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref PocketOpsApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref PocketOpsUsagePlan
 
   # ── Lambda: EC2 Manager ───────────────────────────────────
   Ec2ManagerFunction:
@@ -181,6 +209,9 @@ Outputs:
   ApiBaseUrl:
     Description: API GatewayのベースURL
     Value: !Sub "https://${PocketOpsApi}.execute-api.${AWS::Region}.amazonaws.com/v1"
+  ApiKeyId:
+    Description: APIキーID（値の取得は aws apigateway get-api-key --api-key <id> --include-value）
+    Value: !Ref PocketOpsApiKey
   Ec2ManagerArn:
     Value: !GetAtt Ec2ManagerFunction.Arn
   DockerStatusArn:

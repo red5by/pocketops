@@ -1,16 +1,20 @@
 /**
  * PocketOps API クライアント
  * Lambda + API Gateway と通信する唯一の窓口
- * デプロイ後に BASE_URL を sam deploy の ApiBaseUrl 出力値で置き換える
+ *
+ * セットアップ手順:
+ *   1. sam deploy 後に表示される ApiBaseUrl を BASE_URL にセット
+ *   2. aws apigateway get-api-key --api-key <id> --include-value で取得した値を API_KEY にセット
+ *   3. このファイルはコミットしないこと（.gitignore に追加推奨）
  */
+import {API_BASE_URL, API_KEY_VALUE} from '../../config';
 
-const BASE_URL =
-  process.env.API_BASE_URL ??
-  'https://yp2qvijfk1.execute-api.ap-northeast-1.amazonaws.com/v1';
+const BASE_URL = API_BASE_URL;
+const API_KEY = API_KEY_VALUE;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: {'Content-Type': 'application/json'},
+    headers: {'Content-Type': 'application/json', 'x-api-key': API_KEY},
     ...options,
   });
   if (!res.ok) {

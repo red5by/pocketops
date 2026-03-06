@@ -22,6 +22,9 @@ DerivedData
 *.xcuserstate
 **/.xcode.env.local
 
+# ローカル設定（APIキー・エンドポイントURL）
+config.ts
+
 # Android/IntelliJ
 #
 build/
