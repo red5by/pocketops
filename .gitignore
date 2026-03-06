@@ -15,3 +15,6 @@ mobile/PocketOps/package-lock.json
 
 # Lambda build artifacts
 lambda/.DS_Store
+
+# ローカルメモ
+docs/
