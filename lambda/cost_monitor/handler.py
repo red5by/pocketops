@@ -4,6 +4,26 @@ from datetime import date, timedelta
 
 import boto3
 
+# ── Firebase Admin (module-level cache) ────────────────────────────────────
+_firebase_initialized = False
+
+
+def _get_messaging():
+    global _firebase_initialized
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+
+    if not _firebase_initialized:
+        ssm = boto3.client("ssm", region_name=os.environ.get("AWS_REGION", "ap-northeast-1"))
+        param = ssm.get_parameter(Name="/pocketops/fcm/service-account", WithDecryption=True)
+        sa_info = json.loads(param["Parameter"]["Value"])
+        cred = credentials.Certificate(sa_info)
+        firebase_admin.initialize_app(cred)
+        _firebase_initialized = True
+
+    return messaging
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def _response(status, body):
@@ -28,6 +48,15 @@ def _get_threshold():
         return float(param["Parameter"]["Value"])
     except Exception:
         return None
+
+
+def _get_device_tokens():
+    ssm = _get_ssm_client()
+    try:
+        param = ssm.get_parameter(Name="/pocketops/fcm/device-tokens")
+        return json.loads(param["Parameter"]["Value"])
+    except Exception:
+        return []
 
 
 # ── Cost Explorer ──────────────────────────────────────────────────────────
@@ -147,6 +176,28 @@ def handle_get_costs():
         return _response(500, {"error": str(e)})
 
 
+def handle_register_token(body_str):
+    try:
+        body = json.loads(body_str or "{}")
+        token = body.get("token", "").strip()
+        if not token:
+            return _response(400, {"error": "token is required"})
+        ssm = _get_ssm_client()
+        tokens = _get_device_tokens()
+        if token not in tokens:
+            tokens.append(token)
+        tokens = tokens[-5:]
+        ssm.put_parameter(
+            Name="/pocketops/fcm/device-tokens",
+            Value=json.dumps(tokens),
+            Type="String",
+            Overwrite=True,
+        )
+        return _response(200, {"registered": True, "tokenCount": len(tokens)})
+    except Exception as e:
+        return _response(500, {"error": str(e)})
+
+
 def handle_get_threshold():
     threshold = _get_threshold()
     return _response(200, {"threshold": threshold, "currency": "USD"})
@@ -178,8 +229,32 @@ def handle_scheduled():
         costs = _fetch_costs()
         cost = costs["daily"]["yesterday"]
         threshold = _get_threshold()
-        exceeded = threshold is not None and cost > threshold
-        return {"status": "ok", "cost": cost, "threshold": threshold, "exceeded": exceeded, "notified": False}
+
+        if threshold is None or cost <= threshold:
+            return {"status": "ok", "cost": cost, "threshold": threshold, "notified": False}
+
+        tokens = _get_device_tokens()
+        if not tokens:
+            return {"status": "ok", "cost": cost, "notified": False, "reason": "no tokens"}
+
+        messaging = _get_messaging()
+        sent = 0
+        for token in tokens:
+            try:
+                message = messaging.Message(
+                    notification=messaging.Notification(
+                        title="AWS コスト超過アラート",
+                        body=f"昨日のコスト: ${cost:.2f} (閾値: ${threshold:.2f})",
+                    ),
+                    data={"screen": "costs", "cost": str(round(cost, 4))},
+                    token=token,
+                )
+                messaging.send(message)
+                sent += 1
+            except Exception:
+                pass
+
+        return {"status": "ok", "cost": cost, "threshold": threshold, "notified": True, "sent": sent}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -197,6 +272,8 @@ def handler(event, context):
 
     if path == "/costs" and method == "GET":
         return handle_get_costs()
+    elif path == "/costs/device-token" and method == "POST":
+        return handle_register_token(body)
     elif path == "/costs/threshold" and method == "GET":
         return handle_get_threshold()
     elif path == "/costs/threshold" and method == "POST":

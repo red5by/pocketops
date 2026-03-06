@@ -5,12 +5,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
+import messaging from '@react-native-firebase/messaging';
 import DashboardScreen from './src/screens/DashboardScreen';
 import ContainerScreen from './src/screens/ContainerScreen';
 import PlaybookScreen from './src/screens/PlaybookScreen';
 import CostScreen from './src/screens/CostScreen';
 import BiometricAuth from './src/native/BiometricAuth';
+import {registerDeviceToken} from './src/api/client';
 
 type Tab = 'dashboard' | 'containers' | 'playbooks' | 'costs';
 
@@ -35,6 +39,35 @@ function App() {
   useEffect(() => {
     authenticate();
   }, []);
+
+  useEffect(() => {
+    if (locked) return;
+    const setupFCM = async () => {
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        );
+      }
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      if (!enabled) return;
+      const token = await messaging().getToken();
+      try {
+        await registerDeviceToken(token);
+      } catch {}
+      messaging().onNotificationOpenedApp(msg => {
+        if (msg?.data?.screen === 'costs') setTab('costs');
+      });
+      messaging()
+        .getInitialNotification()
+        .then(msg => {
+          if (msg?.data?.screen === 'costs') setTab('costs');
+        });
+    };
+    setupFCM();
+  }, [locked]);
 
   if (locked) {
     return (

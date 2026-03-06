@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# AWS SAM
+infrastructure/.aws-sam/
+infrastructure/samconfig.toml
+infrastructure/.python-version
+
+# Firebase credentials (secret)
+mobile/PocketOps/android/app/google-services.json
+
+# Node
+mobile/PocketOps/node_modules/
+mobile/PocketOps/package-lock.json
+
+# Lambda build artifacts
+lambda/.DS_Store

@@ -152,6 +152,12 @@ Resources:
             RestApiId: !Ref PocketOpsApi
             Path: /costs
             Method: GET
+        RegisterDeviceToken:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PocketOpsApi
+            Path: /costs/device-token
+            Method: POST
         GetThreshold:
           Type: Api
           Properties:
